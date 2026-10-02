@@ -1,0 +1,12 @@
+# Front panel naplatnog kioska (CWS praonica): ESP32-S3-WROOM-1 (YD-ESP32-S3 N16R8 za razvoj)
+CONFIG_IDF_TARGET="esp32s3"
+
+# Konzola na ugradjenom USB-Serial-JTAG — sva tri UART-a su zauzeta (CWS link, Payten, QR)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# 1 ms tick — glavna petlja na 5 ms
+CONFIG_FREERTOS_HZ=1000
+
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
