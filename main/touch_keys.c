@@ -68,6 +68,10 @@ void touch_keys_set_threshold(uint32_t pm)
 {
     nvs_handle_t h;
 
+    if (!sens) {
+        printf("[touch] touch tasteri nisu aktivni (front panel je displej)\n");
+        return;
+    }
     if (pm < 1 || pm > 500) {
         printf("[touch] prag mora biti 1..500 promila\n");
         return;
@@ -91,6 +95,10 @@ bool touch_keys_get(key_id_t *key)
 {
     int64_t now = esp_timer_get_time() / 1000;
 
+    if (!key_q) {
+        return false;                           /* varijanta sa displejom — tasteri nisu aktivni */
+    }
+
     while (xQueueReceive(key_q, key, 0) == pdTRUE) {
         if (now - last_press_ms[*key] >= REPEAT_GUARD_MS) {
             last_press_ms[*key] = now;
@@ -102,6 +110,10 @@ bool touch_keys_get(key_id_t *key)
 
 void touch_keys_dump(void)
 {
+    if (!sens) {
+        printf("[touch] touch tasteri nisu aktivni (front panel je displej)\n");
+        return;
+    }
     printf("[touch] prag %" PRIu32 " promila\n", permille);
     for (int i = 0; i < KEY_COUNT; i++) {
         uint32_t bm[TOUCH_SAMPLE_CFG_NUM] = {0}, sm[TOUCH_SAMPLE_CFG_NUM] = {0};
@@ -115,6 +127,9 @@ void touch_keys_dump(void)
 
 void key_led_set(key_id_t key, bool on)
 {
+    if (!key_q) {
+        return;                                 /* LED postoje samo na plocici sa tasterima */
+    }
     gpio_set_level(led_gpios[key], on ? 1 : 0);
 }
 

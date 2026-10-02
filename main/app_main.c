@@ -27,6 +27,7 @@
 #include "qr_reader.h"
 #include "touch_keys.h"
 #include "pos_payment.h"
+#include "panel_variant.h"
 
 static const char *TAG = "panel";
 
@@ -57,6 +58,7 @@ static void help(void)
            "  touch          vrijednosti touch tastera (kalibracija kroz pleksi)\n"
            "  thr <promil>   prag touch tastera (npr. thr 20 = 2 %%)\n"
            "  link           stanje linka ka CWS ploci\n"
+           "  panel [auto|pads|lcd]  varijanta front panela (vazi poslije restarta)\n"
            "  https://...    zalijepljen link racuna = kao da je QR citac procitao\n");
 }
 
@@ -68,6 +70,8 @@ static void on_console_line(char *s)
         touch_keys_dump();
     } else if (!strncmp(s, "thr ", 4)) {
         touch_keys_set_threshold((uint32_t)atoi(s + 4));
+    } else if (!strncmp(s, "panel", 5) && (s[5] == '\0' || s[5] == ' ')) {
+        panel_variant_console(s + 5);
     } else if (!strcmp(s, "link")) {
         cws_link_status();
     } else if (strlen(s) == 1) {
@@ -134,7 +138,12 @@ void app_main(void)
     ESP_LOGI(TAG, "kiosk front panel start");
     cws_link_init(on_gift);
     qr_reader_init();
-    touch_keys_init();
+    if (panel_variant_detect() == PANEL_PADS) {
+        touch_keys_init();
+    } else {
+        /* TODO: SPI displej (esp_lcd ST7796) + touch + LVGL UI sa istih 5 dugmadi */
+        ESP_LOGW(TAG, "displej varijanta: UI jos nije implementiran — tasteri samo preko konzole");
+    }
     pos_payment_init();
 
     con_q = xQueueCreate(4, sizeof(char *));
