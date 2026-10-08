@@ -4,7 +4,8 @@
  *   UART0  link ka CWS ploci kioska (QR poklon, kredit kartice, displej, RDY)
  *   UART1  Payten POS terminal
  *   UART2  DFR0660 / GM65 QR citac
- *   touch  5 tastera iza pleksija (1/2/5 KM, PONISTI, PLACANJE) + LED
+ *   touch  5 tastera iza pleksija (1/2/5 KM, PONISTI, PLACANJE) + LED — ESP32 touch
+ *          ili TTP223 na istim pinovima (vidi board.h)
  *   USB    konzola (USB-Serial-JTAG)
  *
  * Sve osim konzole radi u jednoj petlji (5 ms) — moduli nemaju dijeljeno stanje
@@ -58,7 +59,7 @@ static void help(void)
            "  touch          vrijednosti touch tastera (kalibracija kroz pleksi)\n"
            "  thr <promil>   prag touch tastera (npr. thr 20 = 2 %%)\n"
            "  link           stanje linka ka CWS ploci\n"
-           "  panel [auto|pads|lcd]  varijanta front panela (vazi poslije restarta)\n"
+           "  panel [auto|pads|ttp|lcd]  varijanta front panela (vazi poslije restarta)\n"
            "  https://...    zalijepljen link racuna = kao da je QR citac procitao\n");
 }
 
@@ -138,8 +139,9 @@ void app_main(void)
     ESP_LOGI(TAG, "kiosk front panel start");
     cws_link_init(on_gift);
     qr_reader_init();
-    if (panel_variant_detect() == PANEL_PADS) {
-        touch_keys_init();
+    panel_variant_t panel = panel_variant_detect();
+    if (panel == PANEL_PADS || panel == PANEL_TTP) {
+        touch_keys_init(panel == PANEL_TTP);
     } else {
         /* TODO: SPI displej (esp_lcd ST7796) + touch + LVGL UI sa istih 5 dugmadi */
         ESP_LOGW(TAG, "displej varijanta: UI jos nije implementiran — tasteri samo preko konzole");

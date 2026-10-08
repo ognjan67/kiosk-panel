@@ -46,13 +46,24 @@
  *  38-42 | LED ispod tastera             | slobodno
  *        + 3V3, GND
  *
- * Varijantu bira panel_variant.c: NVS "panel" = auto (default) / pads / lcd; auto =
- * probe touch kontrolera displeja na I2C (GPIO1/2).
+ * Tasteri A su goli padovi (ESP32 touch) ili padovi sa TTP223 (digitalni ulaz) — vidi
+ * ispod. Varijantu bira panel_variant.c: NVS "panel" = auto (default) / pads / ttp /
+ * lcd; auto = TTP223 izlazi drze pinove LOW -> ttp, inace probe touch kontrolera
+ * displeja na I2C (GPIO1/2) -> lcd, inace pads.
  */
 
-/* A: kapacitivni tasteri iza pleksija — touch kanal N = GPIO N na ESP32-S3 */
+/*
+ * A: kapacitivni tasteri iza pleksija, ista plocica u dvije izvedbe (nikad mijesano):
+ *   PANEL_PADS  pad -> R_A 0 R -> GPIO, ESP32 touch kanal N = GPIO N (+ shield GPIO14)
+ *   PANEL_TTP   pad -> TTP223 TP; TTP223 Q -> R_B 1 k -> GPIO (digitalni ulaz)
+ *               TTP223 na 3V3, TOG=0 AHLB=0 (direktno, aktivno HIGH), Cs 0-50 pF za
+ *               osjetljivost kroz pleksi; R_A se ne lemi; shield se ne koristi.
+ *               R_B stiti od sudara izlaza dok auto-probe displeja drzi GPIO5 kao izlaz.
+ */
 #define KEY_COUNT       5
-#define KEY_TOUCH_CHANS { 1, 2, 4, 5, 6 }   /* 1 KM, 2 KM, 5 KM, PONISTI, PLACANJE */
+#define KEY_GPIOS       { 1, 2, 4, 5, 6 }   /* 1 KM, 2 KM, 5 KM, PONISTI, PLACANJE */
+#define KEY_TOUCH_CHANS KEY_GPIOS
+#define KEY_TTP_ACTIVE_LEVEL 1
 #define KEY_LED_GPIOS   { 38, 39, 40, 41, 42 }
 #define TOUCH_USE_SHIELD 1                   /* GPIO14 = shield elektroda (voda na pleksiju) */
 

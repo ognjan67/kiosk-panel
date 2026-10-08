@@ -33,6 +33,31 @@ static void mode_get(char *buf, size_t len)
     }
 }
 
+/* TTP223 izlazi (push-pull, aktivno HIGH) u mirovanju drze pin LOW i protiv pull-up-a */
+static bool probe_ttp223(void)
+{
+    static const int pins[KEY_COUNT] = KEY_GPIOS;
+    int low = 0;
+
+    for (int i = 0; i < KEY_COUNT; i++) {
+        gpio_reset_pin(pins[i]);
+        gpio_set_direction(pins[i], GPIO_MODE_INPUT);
+        gpio_set_pull_mode(pins[i], GPIO_PULLUP_ONLY);
+    }
+    vTaskDelay(pdMS_TO_TICKS(2));
+    for (int i = 0; i < KEY_COUNT; i++) {
+        if (gpio_get_level(pins[i]) == 0) {
+            low++;
+        }
+        gpio_reset_pin(pins[i]);
+    }
+    if (low >= 3) {
+        ESP_LOGI(TAG, "%d od %d pinova tastera aktivno LOW — TTP223", low, KEY_COUNT);
+        return true;
+    }
+    return false;
+}
+
 static bool probe_touch_controller(void)
 {
     i2c_master_bus_config_t cfg = {
@@ -81,8 +106,12 @@ panel_variant_t panel_variant_detect(void)
     mode_get(mode, sizeof(mode));
     if (!strcmp(mode, "pads")) {
         v = PANEL_PADS;
+    } else if (!strcmp(mode, "ttp")) {
+        v = PANEL_TTP;
     } else if (!strcmp(mode, "lcd")) {
         v = PANEL_LCD;
+    } else if (probe_ttp223()) {
+        v = PANEL_TTP;
     } else {
         v = probe_touch_controller() ? PANEL_LCD : PANEL_PADS;
     }
@@ -92,7 +121,11 @@ panel_variant_t panel_variant_detect(void)
 
 const char *panel_variant_name(panel_variant_t v)
 {
-    return v == PANEL_LCD ? "displej sa touch ekranom" : "touch tasteri";
+    switch (v) {
+    case PANEL_TTP: return "TTP223 tasteri";
+    case PANEL_LCD: return "displej sa touch ekranom";
+    default:        return "touch tasteri (ESP32)";
+    }
 }
 
 void panel_variant_console(const char *arg)
@@ -105,11 +138,11 @@ void panel_variant_console(const char *arg)
     }
     if (!*arg) {
         mode_get(mode, sizeof(mode));
-        printf("[panel] podesavanje: %s (auto / pads / lcd — vazi poslije restarta)\n", mode);
+        printf("[panel] podesavanje: %s (auto / pads / ttp / lcd — vazi poslije restarta)\n", mode);
         return;
     }
-    if (strcmp(arg, "auto") && strcmp(arg, "pads") && strcmp(arg, "lcd")) {
-        printf("[panel] panel auto | pads | lcd\n");
+    if (strcmp(arg, "auto") && strcmp(arg, "pads") && strcmp(arg, "ttp") && strcmp(arg, "lcd")) {
+        printf("[panel] panel auto | pads | ttp | lcd\n");
         return;
     }
     if (nvs_open("panel", NVS_READWRITE, &h) == ESP_OK) {

@@ -1,5 +1,6 @@
 /*
  * touch_keys.c — vidi touch_keys.h. Inicijalizacija po IDF primjeru touch_sens_basic.
+ * TTP223 rezim: isti pinovi kao digitalni ulazi, prozivka iz touch_keys_get() (5 ms).
  */
 #include "touch_keys.h"
 #include "board.h"
@@ -30,6 +31,27 @@ static touch_channel_handle_t shield;
 static QueueHandle_t key_q;
 static uint32_t permille = DEFAULT_PERMILLE;
 static int64_t  last_press_ms[KEY_COUNT];
+
+static enum { KEYS_OFF = 0, KEYS_TOUCH, KEYS_TTP } mode;   /* KEYS_OFF = front panel je displej */
+static uint8_t ttp_hist[KEY_COUNT];       /* zadnja 2 uzorka (bit0 = najnoviji) */
+static bool    ttp_down[KEY_COUNT];
+
+/* pritisak = 2 uzastopna aktivna uzorka (10 ms), otpusten = 2 neaktivna */
+static void ttp_poll(void)
+{
+    for (int i = 0; i < KEY_COUNT; i++) {
+        uint8_t on = gpio_get_level(chan_ids[i]) == KEY_TTP_ACTIVE_LEVEL;
+
+        ttp_hist[i] = (uint8_t)(((ttp_hist[i] << 1) | on) & 0x03u);
+        if (ttp_hist[i] == 0x03u && !ttp_down[i]) {
+            key_id_t k = (key_id_t)i;
+            ttp_down[i] = true;
+            xQueueSend(key_q, &k, 0);
+        } else if (ttp_hist[i] == 0) {
+            ttp_down[i] = false;
+        }
+    }
+}
 
 static bool IRAM_ATTR on_active(touch_sensor_handle_t s, const touch_active_event_data_t *ev, void *ctx)
 {
@@ -68,8 +90,12 @@ void touch_keys_set_threshold(uint32_t pm)
 {
     nvs_handle_t h;
 
-    if (!sens) {
+    if (mode == KEYS_OFF) {
         printf("[touch] touch tasteri nisu aktivni (front panel je displej)\n");
+        return;
+    }
+    if (mode == KEYS_TTP) {
+        printf("[touch] TTP223 tasteri — osjetljivost se podesava kondenzatorom Cs na TTP223\n");
         return;
     }
     if (pm < 1 || pm > 500) {
@@ -95,8 +121,11 @@ bool touch_keys_get(key_id_t *key)
 {
     int64_t now = esp_timer_get_time() / 1000;
 
-    if (!key_q) {
+    if (mode == KEYS_OFF) {
         return false;                           /* varijanta sa displejom — tasteri nisu aktivni */
+    }
+    if (mode == KEYS_TTP) {
+        ttp_poll();
     }
 
     while (xQueueReceive(key_q, key, 0) == pdTRUE) {
@@ -110,8 +139,17 @@ bool touch_keys_get(key_id_t *key)
 
 void touch_keys_dump(void)
 {
-    if (!sens) {
+    if (mode == KEYS_OFF) {
         printf("[touch] touch tasteri nisu aktivni (front panel je displej)\n");
+        return;
+    }
+    if (mode == KEYS_TTP) {
+        printf("[touch] TTP223 tasteri (aktivno %s)\n", KEY_TTP_ACTIVE_LEVEL ? "HIGH" : "LOW");
+        for (int i = 0; i < KEY_COUNT; i++) {
+            int lvl = gpio_get_level(chan_ids[i]);
+            printf("  taster %d GPIO%-2d nivo %d %s\n", i, chan_ids[i], lvl,
+                   lvl == KEY_TTP_ACTIVE_LEVEL ? "(pritisnut)" : "");
+        }
         return;
     }
     printf("[touch] prag %" PRIu32 " promila\n", permille);
@@ -127,13 +165,13 @@ void touch_keys_dump(void)
 
 void key_led_set(key_id_t key, bool on)
 {
-    if (!key_q) {
+    if (mode == KEYS_OFF) {
         return;                                 /* LED postoje samo na plocici sa tasterima */
     }
     gpio_set_level(led_gpios[key], on ? 1 : 0);
 }
 
-void touch_keys_init(void)
+void touch_keys_init(bool ttp)
 {
     nvs_handle_t h;
     touch_sensor_sample_config_t sample_cfg[TOUCH_SAMPLE_CFG_NUM] = {
@@ -153,13 +191,26 @@ void touch_keys_init(void)
         gpio_set_direction(led_gpios[i], GPIO_MODE_OUTPUT);
         gpio_set_level(led_gpios[i], 0);
     }
+    key_q = xQueueCreate(16, sizeof(key_id_t));
+
+    if (ttp) {
+        /* TTP223 izlaz je push-pull (kroz R_B 1 k) — bez internih pull otpornika */
+        for (int i = 0; i < KEY_COUNT; i++) {
+            gpio_reset_pin(chan_ids[i]);
+            gpio_set_direction(chan_ids[i], GPIO_MODE_INPUT);
+            gpio_set_pull_mode(chan_ids[i], GPIO_FLOATING);
+        }
+        mode = KEYS_TTP;
+        ESP_LOGI(TAG, "%d TTP223 tastera (digitalni ulazi, aktivno %s)", KEY_COUNT,
+                 KEY_TTP_ACTIVE_LEVEL ? "HIGH" : "LOW");
+        return;
+    }
 
     if (nvs_open("touch", NVS_READONLY, &h) == ESP_OK) {
         nvs_get_u32(h, "permille", &permille);
         nvs_close(h);
     }
 
-    key_q = xQueueCreate(16, sizeof(key_id_t));
     ESP_ERROR_CHECK(touch_sensor_new_controller(&sens_cfg, &sens));
     for (int i = 0; i < KEY_COUNT; i++) {
         ESP_ERROR_CHECK(touch_sensor_new_channel(sens, chan_ids[i], &chan_cfg, &chans[i]));
@@ -186,6 +237,7 @@ void touch_keys_init(void)
     ESP_ERROR_CHECK(touch_sensor_register_callbacks(sens, &cbs, NULL));
     ESP_ERROR_CHECK(touch_sensor_enable(sens));
     ESP_ERROR_CHECK(touch_sensor_start_continuous_scanning(sens));
+    mode = KEYS_TOUCH;
     ESP_LOGI(TAG, "%d tastera, prag %" PRIu32 " promila%s", KEY_COUNT, permille,
              TOUCH_USE_SHIELD ? ", shield GPIO14" : "");
 }
