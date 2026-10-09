@@ -1,6 +1,6 @@
 /*
  * touch_keys.c — vidi touch_keys.h. Inicijalizacija po IDF primjeru touch_sens_basic.
- * TTP223 rezim: isti pinovi kao digitalni ulazi, prozivka iz touch_keys_get() (5 ms).
+ * TTP223 rezim (Touch_5T): isti pinovi kao digitalni ulazi, prozivka iz touch_keys_get() (5 ms).
  */
 #include "touch_keys.h"
 #include "board.h"
@@ -194,11 +194,11 @@ void touch_keys_init(bool ttp)
     key_q = xQueueCreate(16, sizeof(key_id_t));
 
     if (ttp) {
-        /* TTP223 izlaz je push-pull (kroz R_B 1 k) — bez internih pull otpornika */
+        /* Touch_5T: TTP223 -> BC817 open-collector; 10 k pull-up na glavnoj ploci + interni */
         for (int i = 0; i < KEY_COUNT; i++) {
             gpio_reset_pin(chan_ids[i]);
             gpio_set_direction(chan_ids[i], GPIO_MODE_INPUT);
-            gpio_set_pull_mode(chan_ids[i], GPIO_FLOATING);
+            gpio_set_pull_mode(chan_ids[i], GPIO_PULLUP_ONLY);
         }
         mode = KEYS_TTP;
         ESP_LOGI(TAG, "%d TTP223 tastera (digitalni ulazi, aktivno %s)", KEY_COUNT,

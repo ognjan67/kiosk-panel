@@ -1,14 +1,15 @@
 /*
- * touch_keys — 5 kapacitivnih tastera iza pleksija (ESP32-S3 touch, novi driver
- * esp_driver_touch_sens) + LED ispod svakog tastera.
+ * touch_keys — 5 kapacitivnih tastera iza pleksija + LED prsten oko svakog tastera.
  *
- * Prag = benchmark * prag_%. Kroz 5 mm pleksi promjena je mala (red velicine
- * 1-3 %), pa se prag podesava na licu mjesta: konzola "touch" ispisuje benchmark i
- * smooth vrijednosti, "thr <promil>" postavlja prag (cuva se u NVS-u).
+ * ttp = true (glavna varijanta): plocica Touch_5T_4cm — TTP223 + BC817 open-collector po
+ * tasteru, linije su digitalni ulazi aktivni LOW (pull-up), prozivaju se iz glavne
+ * petlje; osjetljivost se podesava kondenzatorom Cs na TTP223, ne pragom.
  *
- * Rezerva: TTP223 na plocici sa padovima (ttp = true) — isti pinovi su tada digitalni
- * ulazi (aktivno HIGH), prozivaju se iz glavne petlje; osjetljivost se podesava
- * kondenzatorom Cs na TTP223, ne pragom.
+ * ttp = false ("panel pads", bez plocice za sada): ESP32-S3 touch na golim padovima
+ * (driver esp_driver_touch_sens). Prag = benchmark * prag_%; konzola "touch" ispisuje
+ * benchmark i smooth vrijednosti, "thr <promil>" postavlja prag (cuva se u NVS-u).
+ *
+ * key_led_set(): GPIO38-42 HIGH = upaljen prsten (low-side MOSFET na glavnoj ploci).
  */
 #pragma once
 

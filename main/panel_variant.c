@@ -33,31 +33,6 @@ static void mode_get(char *buf, size_t len)
     }
 }
 
-/* TTP223 izlazi (push-pull, aktivno HIGH) u mirovanju drze pin LOW i protiv pull-up-a */
-static bool probe_ttp223(void)
-{
-    static const int pins[KEY_COUNT] = KEY_GPIOS;
-    int low = 0;
-
-    for (int i = 0; i < KEY_COUNT; i++) {
-        gpio_reset_pin(pins[i]);
-        gpio_set_direction(pins[i], GPIO_MODE_INPUT);
-        gpio_set_pull_mode(pins[i], GPIO_PULLUP_ONLY);
-    }
-    vTaskDelay(pdMS_TO_TICKS(2));
-    for (int i = 0; i < KEY_COUNT; i++) {
-        if (gpio_get_level(pins[i]) == 0) {
-            low++;
-        }
-        gpio_reset_pin(pins[i]);
-    }
-    if (low >= 3) {
-        ESP_LOGI(TAG, "%d od %d pinova tastera aktivno LOW — TTP223", low, KEY_COUNT);
-        return true;
-    }
-    return false;
-}
-
 static bool probe_touch_controller(void)
 {
     i2c_master_bus_config_t cfg = {
@@ -71,9 +46,13 @@ static bool probe_touch_controller(void)
     i2c_master_bus_handle_t bus;
     bool found = false;
 
-    /* touch kontroler odgovara tek kad mu RST nije aktivan (aktivno nizak) */
+    /*
+     * touch kontroler odgovara tek kad mu RST nije aktivan (aktivno nizak). Open-drain:
+     * na Touch_5T je isti pin kolektor BC817 (taster PONISTI) — bez sudara izlaza.
+     */
     gpio_reset_pin(LCD_TP_RST_GPIO);
-    gpio_set_direction(LCD_TP_RST_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_direction(LCD_TP_RST_GPIO, GPIO_MODE_OUTPUT_OD);
+    gpio_set_pull_mode(LCD_TP_RST_GPIO, GPIO_PULLUP_ONLY);
     gpio_set_level(LCD_TP_RST_GPIO, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
     gpio_set_level(LCD_TP_RST_GPIO, 1);
@@ -93,7 +72,7 @@ static bool probe_touch_controller(void)
     gpio_reset_pin(LCD_TP_SDA_GPIO);
     gpio_reset_pin(LCD_TP_SCL_GPIO);
     if (!found) {
-        gpio_reset_pin(LCD_TP_RST_GPIO);             /* PONISTI pad */
+        gpio_reset_pin(LCD_TP_RST_GPIO);             /* taster PONISTI */
     }
     return found;
 }
@@ -110,10 +89,8 @@ panel_variant_t panel_variant_detect(void)
         v = PANEL_TTP;
     } else if (!strcmp(mode, "lcd")) {
         v = PANEL_LCD;
-    } else if (probe_ttp223()) {
-        v = PANEL_TTP;
     } else {
-        v = probe_touch_controller() ? PANEL_LCD : PANEL_PADS;
+        v = probe_touch_controller() ? PANEL_LCD : PANEL_TTP;
     }
     ESP_LOGI(TAG, "front panel: %s (podesavanje: %s)", panel_variant_name(v), mode);
     return v;

@@ -4,8 +4,8 @@
  *   UART0  link ka CWS ploci kioska (QR poklon, kredit kartice, displej, RDY)
  *   UART1  Payten POS terminal
  *   UART2  DFR0660 / GM65 QR citac
- *   touch  5 tastera iza pleksija (1/2/5 KM, PONISTI, PLACANJE) + LED — ESP32 touch
- *          ili TTP223 na istim pinovima (vidi board.h)
+ *   keys   5 TTP223 tastera iza pleksija (1/2/5 KM, PONISTI, PLACANJE) + LED prsten,
+ *          plocica Touch_5T_4cm (ili SPI displej na istim pinovima, vidi board.h)
  *   USB    konzola (USB-Serial-JTAG)
  *
  * Sve osim konzole radi u jednoj petlji (5 ms) — moduli nemaju dijeljeno stanje
@@ -56,10 +56,10 @@ static void help(void)
     printf("komande:\n"
            "  1 2 5 c p      tasteri: 1/2/5 KM, PONISTI, PLACANJE\n"
            "  s t l r        Payten: stanje, TID, lista transakcija, oporavak\n"
-           "  touch          vrijednosti touch tastera (kalibracija kroz pleksi)\n"
-           "  thr <promil>   prag touch tastera (npr. thr 20 = 2 %%)\n"
+           "  touch          stanje tastera (TTP223: nivoi linija; pads: touch vrijednosti)\n"
+           "  thr <promil>   prag ESP32 touch tastera, samo pads (npr. thr 20 = 2 %%)\n"
            "  link           stanje linka ka CWS ploci\n"
-           "  panel [auto|pads|ttp|lcd]  varijanta front panela (vazi poslije restarta)\n"
+           "  panel [auto|ttp|lcd|pads]  varijanta front panela (vazi poslije restarta)\n"
            "  https://...    zalijepljen link racuna = kao da je QR citac procitao\n");
 }
 
