@@ -1,9 +1,12 @@
 /*
- * board.h — pinovi front panela (YD-ESP32-S3 N16R8 dev ploca; ista dodjela na budućoj PCB).
- * Vidi docs/plan_qr_poklon_pranje.md (CWS repo, grana qr-poklon).
+ * board.h — pinovi front panela. Ista dodjela na prototipu (YD-ESP32-S3 N16R8, klon
+ * DevKitC-1) i na nasoj PCB sa modulom DFR0896 = ESP32-S3-WROOM-1-N4 (4 MB, bez PSRAM-a;
+ * firmver ga ne koristi). Raspored po letvicama dev ploce i sema plocice sa padovima:
+ * docs/plan_qr_poklon_pranje.md (CWS repo), sekcija "Raspored pinova".
  *
  * Izbjegavati: GPIO43/44 (CH343 USB-UART na dev ploci), GPIO48 (RGB LED), GPIO35-37
  * (octal PSRAM kod N16R8), GPIO19/20 (USB-Serial-JTAG = konzola), GPIO0/3/45/46 (strapping).
+ * GPIO38 (LED1) je na DevKitC-1 v1.1 RGB LED — bezopasno, WS2812 ulaz je visoke impedanse.
  */
 #pragma once
 
@@ -28,23 +31,27 @@
 #define QR_BAUD         9600
 
 /*
- * Front panel konektor — ISTI pinovi, dvije varijante (nikad obje istovremeno):
+ * Front panel konektor 2x10 IDC 2,54 mm — ISTI pinovi, dvije varijante (nikad obje):
  *
- *   GPIO | A: touch tasteri (PANEL_PADS) | B: SPI displej + cap. touch (PANEL_LCD)
- *   -----+-------------------------------+------------------------------------------
- *     1  | taster 1 KM                   | touch I2C SDA
- *     2  | taster 2 KM                   | touch I2C SCL
- *     4  | taster 5 KM                   | touch INT
- *     5  | PONISTI                       | touch RST
- *     6  | PLACANJE                      | LCD DC
- *     7  | —                             | LCD RST
- *    10  | —                             | LCD CS    (FSPI IOMUX — puna brzina SPI-ja)
- *    11  | —                             | LCD MOSI  (FSPI IOMUX)
- *    12  | —                             | LCD SCK   (FSPI IOMUX)
- *    13  | —                             | LCD MISO  (FSPI IOMUX, opciono)
- *    14  | shield elektroda              | LCD pozadinsko svjetlo (PWM)
- *  38-42 | LED ispod tastera             | slobodno
- *        + 3V3, GND
+ *   kon.  | GPIO | A: tasteri (PADS / TTP)   | B: SPI displej + cap. touch (PANEL_LCD)
+ *   ------+------+---------------------------+------------------------------------------
+ *     1   |  —   | +5V (LED preko MOSFET-a)  | +5V
+ *     2   |  —   | +3V3                      | +3V3
+ *    3,4  |  —   | GND                       | GND
+ *     5   |   1  | K1 taster 1 KM            | touch I2C SDA
+ *     6   |   2  | K2 taster 2 KM            | touch I2C SCL
+ *     7   |   4  | K3 taster 5 KM            | touch INT
+ *     8   |   5  | K4 PONISTI                | touch RST
+ *     9   |   6  | K5 PLACANJE               | LCD DC
+ *    10   |  14  | shield (samo ESP touch)   | LCD pozadinsko svjetlo (PWM)
+ *  11-15  | 38-42| LED1-LED5 ispod tastera   | slobodno
+ *    16   |   7  | —                         | LCD RST
+ *    17   |  10  | —                         | LCD CS    (FSPI IOMUX — puna brzina SPI-ja)
+ *    18   |  11  | —                         | LCD MOSI  (FSPI IOMUX)
+ *    19   |  12  | —                         | LCD SCK   (FSPI IOMUX)
+ *    20   |  13  | —                         | LCD MISO  (FSPI IOMUX, opciono)
+ *
+ * Na glavnoj ploci K1-K5 i shield bez pull otpornika i kondenzatora.
  *
  * Tasteri A su goli padovi (ESP32 touch) ili padovi sa TTP223 (digitalni ulaz) — vidi
  * ispod. Varijantu bira panel_variant.c: NVS "panel" = auto (default) / pads / ttp /
